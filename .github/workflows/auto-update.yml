@@ -1,0 +1,50 @@
+name: Automatic Updates
+
+env:
+  UV_SYSTEM_PYTHON: 1
+
+on:
+    schedule:
+    - cron: "0 0 * * 2"
+
+jobs:
+  update-files:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Set Up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        allow-prereleases: true
+    - uses: astral-sh/setup-uv@v3
+      with:
+        enable-cache: true
+        cache-dependency-glob: pyproject.toml
+        cache-suffix: ${{ matrix.python-version }}
+    - name: Install
+      run: make EXTRAS=dev install
+    - name: Regen
+      run: |
+        python -m stdlibs.fetch_releases
+        python -m stdlibs.fetch
+    - name: Test
+      run: make test
+    - name: Lint
+      run: make lint
+    - name: Send Pull Request
+      uses: peter-evans/create-pull-request@v7
+      with:
+        commit-message: "Regenerate stdlibs configuration"
+        branch: regen-stdlibs
+        base: main
+        title: "Regenerate stdlibs configuration"
+        body: |
+          Automated update, to manually run do:
+
+          ```sh
+          python -m stdlibs.fetch_releases
+          python -m stdlibs.fetch
+          ```
+        assignee: thatch
